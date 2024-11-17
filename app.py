@@ -101,26 +101,29 @@ def webcam_feed():
     
     def generate():
         while True:
-            # 從攝像頭讀取一幀影像
             success, frame = cap.read()
             if not success:
-                break  # 如果讀取失敗，則跳出循環
-
-            # 直接使用 OpenCV 的 BGR 格式影像進行 YOLO 檢測
-            results = model(frame, save=False)  # 在影像上進行檢測，並不保存結果
-
-            # 將檢測結果繪製到影像上
+                break
+            ret, buffer = cv2.imencode('.jpg', frame) 
+            frame = buffer.tobytes()
+            print(type(frame))
+            
+            img = Image.open(io.BytesIO(frame))
+ 
+            
+            results = model(img, save=True)              
+            print(results)
+            cv2.waitKey(1)
             res_plotted = results[0].plot()
+            cv2.imshow("result", res_plotted)
+            if cv2.waitKey(1) == ord('q'):
+                break
 
-            # 保持 BGR 格式進行處理，避免顏色偏差
-            ret, buffer = cv2.imencode('.jpg', res_plotted)
-            frame_bytes = buffer.tobytes()
-
-            # 產生多部分格式的 HTTP 響應來傳輸影像幀，這樣瀏覽器能連續顯示更新的影像
+            # 直接對 res_plotted 進行編碼，不進行顏色空間轉換
+            frame = cv2.imencode('.jpg', res_plotted)[1].tobytes()
+                
             yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n\r\n')
-
-    # 使用 Flask Response 將攝像頭影像作為流媒體返回，mime 類型設為 multipart/x-mixed-replace
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == "__main__":
